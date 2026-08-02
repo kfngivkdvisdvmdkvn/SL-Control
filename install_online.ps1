@@ -31,8 +31,8 @@ Write-Host ''
 Write-Host '=== SL Control Agent — กำลังติดตั้ง/อัพเดท ===' -ForegroundColor Cyan
 
 # 1) หยุด agent เดิม (กันไฟล์ถูกล็อกตอนเขียนทับ) + ล้างของเก่า
-schtasks /end /tn $tn 2>$null | Out-Null
-taskkill /f /im agent.exe 2>$null | Out-Null
+Stop-ScheduledTask -TaskName $tn -ErrorAction SilentlyContinue
+Stop-Process -Name agent -Force -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 1
 Unregister-ScheduledTask -TaskName 'NetClassAgent' -Confirm:$false -ErrorAction SilentlyContinue
 

@@ -26,8 +26,8 @@ Write-Host ''
 Write-Host '=== SL Control Agent — กำลังถอนการติดตั้ง ===' -ForegroundColor Cyan
 
 # หยุด + ลบ Task
-schtasks /end /tn $tn 2>$null | Out-Null
-taskkill /f /im agent.exe 2>$null | Out-Null
+Stop-ScheduledTask -TaskName $tn -ErrorAction SilentlyContinue
+Stop-Process -Name agent -Force -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 1
 Stop-ScheduledTask -TaskName $tn
 Unregister-ScheduledTask -TaskName $tn -Confirm:$false
