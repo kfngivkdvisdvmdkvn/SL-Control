@@ -44,12 +44,15 @@ if (-not (Test-Path $exe) -or (Get-Item $exe).Length -lt 1MB) {
     throw "ดาวน์โหลด agent.exe ไม่สำเร็จ (ลิงก์ผิด/ไม่ใช่ลิงก์ดาวน์โหลดตรง?) — ได้ไฟล์เล็กผิดปกติ"
 }
 
-# 3) เขียน config.json (ถ้ามีของเดิมอยู่แล้วเก็บไว้ ไม่ทับ)
-if (-not (Test-Path "$dir\config.json")) {
-    $cfg = [ordered]@{ password = $Password; discovery_port = 45454; control_port = 45455;
-        server_ip = $ServerIp; status_interval = 5; group = '' }
-    ($cfg | ConvertTo-Json) | Set-Content "$dir\config.json" -Encoding UTF8
+# 3) เขียน config.json (UTF-8 ไม่มี BOM — กัน Python json อ่านไม่ได้; ของเดิมเก็บค่าไว้ แค่ตัด BOM)
+$cfgPath = "$dir\config.json"
+if (Test-Path $cfgPath) {
+    $cfgJson = [IO.File]::ReadAllText($cfgPath)          # ของเดิม (ReadAllText ตัด BOM ให้)
+} else {
+    $cfg = [ordered]@{ password = $Password; discovery_port = 45454; control_port = 45455; server_ip = $ServerIp; status_interval = 5; group = '' }
+    $cfgJson = $cfg | ConvertTo-Json
 }
+[IO.File]::WriteAllText($cfgPath, $cfgJson, (New-Object System.Text.UTF8Encoding($false)))
 
 # 4) Scheduled Task — รันตอนล็อกอิน สิทธิ์สูงสุด เบื้องหลัง ตายแล้วรันใหม่เอง
 Unregister-ScheduledTask -TaskName $tn -Confirm:$false -ErrorAction SilentlyContinue
