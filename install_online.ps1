@@ -1,4 +1,4 @@
-﻿# ============================================================================
+# ============================================================================
 #  SL Control Agent — ตัวติดตั้งออนไลน์ (รันบรรทัดเดียว, ขอสิทธิ์แอดมินเอง)
 #
 #  วิธีใช้ที่เครื่องลูก (PowerShell โหมดปกติ ไม่ต้อง Run as admin):
@@ -20,7 +20,7 @@ $Password = 'SL'                             # รหัสเชื่อมต
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
     Write-Host 'กำลังขอสิทธิ์แอดมิน (กด ใช่ ที่หน้าต่าง UAC)...' -ForegroundColor Yellow
-    $cmd = "[Net.ServicePointManager]::SecurityProtocol='Tls12'; irm '$SelfUrl' | iex"
+    $cmd = "[Net.ServicePointManager]::SecurityProtocol='Tls12'; iex ((irm '$SelfUrl').TrimStart([char]0xFEFF))"
     Start-Process powershell -Verb RunAs -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', $cmd
     return
 }
