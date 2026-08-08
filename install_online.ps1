@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 # ====== ตั้งค่า — แก้ตรงนี้ก่อนเอาขึ้นออนไลน์ ======
-$AgentUrl = 'https://www.dropbox.com/scl/fi/mivxi8iavjg517kkzpdwa/agent.exe?rlkey=88rlh5iw93jl57yp6xet9nqky&st=kahnzlnx&dl=1'
+$AgentUrl = 'https://www.dropbox.com/scl/fi/mivxi8iavjg517kkzpdwa/agent.exe?rlkey=88rlh5iw93jl57yp6xet9nqky&dl=1'
 $SelfUrl  = 'https://github.com/kfngivkdvisdvmdkvn/SL-Control/raw/refs/heads/main/install_online.ps1'
 $ServerIp = ''                               # IP เครื่องคุม (เว้นว่าง = ให้หาเจอเองในวง LAN)
 $Password = 'SL'                             # รหัสเชื่อมต่อ (ต้องตรงกับเครื่องคุม)
