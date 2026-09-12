@@ -47,8 +47,27 @@ Write-Host ''
 Write-Host '=== SL Control Agent — ติดตั้ง/อัพเดท ===' -ForegroundColor Cyan
 
 # ---------------------------------------------------------------- ตัวช่วย
+function Test-PyInstallerTail([IO.FileStream]$fs) {
+    # agent.exe เป็น PyInstaller onefile = ตัวโปรแกรม + "คลังไฟล์" ต่อท้ายไว้ตอนท้ายสุด
+    # ถ้าไฟล์ขาดท้าย (โหลด/คัดลอกไม่ครบ) เครื่องหมายนี้จะหายไป แล้วเปิดโปรแกรมจะขึ้น
+    # "Could not load PyInstaller's embedded PKG archive" — เจอจริงหน้างาน 2026-09-12
+    $tail = [Math]::Min(8192, $fs.Length)
+    $fs.Seek(-$tail, 'End') | Out-Null
+    $t = New-Object byte[] $tail
+    $fs.Read($t, 0, $tail) | Out-Null
+    $magic = [byte[]](0x4D, 0x45, 0x49, 0x0C, 0x0B, 0x0A, 0x0B, 0x0E)      # 'MEI' + รหัส
+    for ($i = 0; $i -le ($t.Length - $magic.Length); $i++) {
+        $ok = $true
+        for ($j = 0; $j -lt $magic.Length; $j++) {
+            if ($t[$i + $j] -ne $magic[$j]) { $ok = $false; break }
+        }
+        if ($ok) { return $true }
+    }
+    return $false
+}
+
 function Test-AgentFile([string]$path) {
-    # ไฟล์ที่ใช้ได้ต้อง: มีอยู่จริง · ใหญ่พอ · ขึ้นต้นด้วย 'MZ' (เป็นโปรแกรม Windows จริง)
+    # ไฟล์ที่ใช้ได้ต้อง: มีอยู่จริง · ใหญ่พอ · ขึ้นต้นด้วย 'MZ' · **มีคลังไฟล์ต่อท้ายครบ**
     # กันเคสต้นทางตอบหน้าเว็บ error / ไฟล์โหลดมาไม่ครบ แล้วเราเอาไปทับของดี
     if (-not (Test-Path $path)) { return $false }
     $len = (Get-Item $path).Length
@@ -57,9 +76,11 @@ function Test-AgentFile([string]$path) {
         $fs = [IO.File]::OpenRead($path)
         $b = New-Object byte[] 2
         $n = $fs.Read($b, 0, 2)
+        if ($n -ne 2 -or $b[0] -ne 0x4D -or $b[1] -ne 0x5A) { $fs.Close(); return $false }
+        $tailOk = Test-PyInstallerTail $fs
         $fs.Close()
     } catch { return $false }
-    return ($n -eq 2 -and $b[0] -eq 0x4D -and $b[1] -eq 0x5A)      # 'MZ'
+    return $tailOk
 }
 
 function Get-Sha([string]$path) {

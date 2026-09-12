@@ -29,14 +29,36 @@ function Say([string]$m) {
     try { Add-Content -Path $log -Value $line -Encoding UTF8 } catch { }
 }
 
+function Test-PyInstallerTail([IO.FileStream]$fs) {
+    # agent.exe = PyInstaller onefile: ตัวโปรแกรม + "คลังไฟล์" ต่อท้ายไว้ตอนท้ายสุด
+    # ไฟล์ที่ส่งมาไม่ครบจะไม่มีเครื่องหมายนี้ -> เปิดแล้วขึ้น
+    # "Could not load PyInstaller's embedded PKG archive" (เจอจริงหน้างาน 2026-09-12)
+    $tail = [Math]::Min(8192, $fs.Length)
+    $fs.Seek(-$tail, 'End') | Out-Null
+    $t = New-Object byte[] $tail
+    $fs.Read($t, 0, $tail) | Out-Null
+    $magic = [byte[]](0x4D, 0x45, 0x49, 0x0C, 0x0B, 0x0A, 0x0B, 0x0E)
+    for ($i = 0; $i -le ($t.Length - $magic.Length); $i++) {
+        $ok = $true
+        for ($j = 0; $j -lt $magic.Length; $j++) {
+            if ($t[$i + $j] -ne $magic[$j]) { $ok = $false; break }
+        }
+        if ($ok) { return $true }
+    }
+    return $false
+}
+
 function Test-AgentFile([string]$p) {
     if (-not (Test-Path $p)) { return $false }
     if ((Get-Item $p).Length -lt 5MB) { return $false }
     try {
         $fs = [IO.File]::OpenRead($p); $b = New-Object byte[] 2
-        $n = $fs.Read($b, 0, 2); $fs.Close()
+        $n = $fs.Read($b, 0, 2)
+        if ($n -ne 2 -or $b[0] -ne 0x4D -or $b[1] -ne 0x5A) { $fs.Close(); return $false }
+        $tailOk = Test-PyInstallerTail $fs
+        $fs.Close()
     } catch { return $false }
-    return ($n -eq 2 -and $b[0] -eq 0x4D -and $b[1] -eq 0x5A)
+    return $tailOk
 }
 
 function Start-Agent() {
@@ -60,6 +82,21 @@ if (-not (Test-AgentFile $new)) {
     Say 'ไฟล์ใหม่ยังมาไม่ครบ/ไม่ใช่ไฟล์โปรแกรม -> ไม่แตะของเดิม'
     if (Test-Path $exe) { Start-Agent | Out-Null }
     exit 1
+}
+# คอนโซลส่ง agent.sha256 มาด้วย = รู้ค่าที่ถูกต้องแน่นอน เทียบให้ตรงเป๊ะก่อนค่อยสลับ
+$shaFile = "$dir\update\agent.sha256"
+if (Test-Path $shaFile) {
+    $want = ''
+    try { $want = ((Get-Content $shaFile -Raw) -replace '[^0-9A-Fa-f]', '').ToUpper() } catch { }
+    if ($want.Length -eq 64) {
+        $got = (Get-FileHash $new -Algorithm SHA256).Hash.ToUpper()
+        if ($want -ne $got) {
+            Say ('ไฟล์ที่ส่งมาไม่ตรงกับที่คอนโซลบอก (ได้ {0} ควรเป็น {1}) -> ไม่แตะของเดิม' -f $got.Substring(0, 16), $want.Substring(0, 16))
+            if (Test-Path $exe) { Start-Agent | Out-Null }
+            exit 1
+        }
+        Say 'ไฟล์ตรงกับที่คอนโซลบอกทุกไบต์'
+    }
 }
 if ((Test-Path $exe) -and (Get-FileHash $new -Algorithm SHA256).Hash -eq (Get-FileHash $exe -Algorithm SHA256).Hash) {
     Say 'เป็นตัวเดียวกับที่ใช้อยู่แล้ว -> ไม่ต้องอัพเดท'
